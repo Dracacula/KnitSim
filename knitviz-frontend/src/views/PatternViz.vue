@@ -1,18 +1,29 @@
 <template>
   <main>
     <div class="pattern_viz">
-      <div class="code_editor">
-        <h2>Code Editor</h2>
-        <Code> </Code>
-        <div class="code_editor_header">
-          <Btn @click="runCode">Run</Btn>
-          <Btn @click="startSim" v-if="!state.simulation.running">Simulate</Btn>
-          <Btn @click="stopSim" v-if="state.simulation.running">Stop</Btn>
-          <span>Step: {{ state.simulation.step }} / Delta: {{ state.simulation.acc_delta }}</span>
+      <div class="editor-container">
+        <div class="editor-title">
+          <h2>{{ state.doShowCodeEditor ? "Code Editor" : "Visual Editor" }}</h2>
+          <button @click="toggleEditor">
+            Switch to {{ state.doShowCodeEditor ? "Visual Editor" : "Code Editor" }}
+          </button>
         </div>
-        <div class="code_editor_header">
-          <div>Prefill:</div>
-          <Btn @click="state.code = state.examples[k]" v-for="k in Object.keys(state.examples)">{{ k }}</Btn>
+
+        <div class="visual-editor" v-if="!state.doShowCodeEditor">
+          <VisualEditor @patternGenerated="onPatternGenerated"></VisualEditor>
+        </div>
+        <div class="code_editor" v-if="state.doShowCodeEditor">
+          <Code v-if="state.doShowCodeEditor"></Code>
+          <div class="code_editor_header">
+            <Btn @click="runCode">Run</Btn>
+            <Btn @click="startSim" v-if="!state.simulation.running">Simulate</Btn>
+            <Btn @click="stopSim" v-if="state.simulation.running">Stop</Btn>
+            <span>Step: {{ state.simulation.step }} / Delta: {{ state.simulation.acc_delta }}</span>
+          </div>
+          <div class="code_editor_header">
+            <div>Prefill:</div>
+            <Btn @click="state.code = state.examples[k]" v-for="k in Object.keys(state.examples)">{{ k }}</Btn>
+          </div>
         </div>
       </div>
       <div id="pattern_viz_3d"></div>
@@ -22,6 +33,7 @@
 
 <script setup lang="ts">
 import Code from "@/components/editor/Code.vue";
+import VisualEditor from "@/components/editor/VisualEditor.vue";
 import { KnitGraph } from "../knitgraph";
 import { PatternViz3D, PatternViz3DEvents } from "../knitgraph/3d/viz";
 import { onUnmounted, reactive, ref, toRaw, watch } from "vue";
@@ -33,6 +45,7 @@ import Btn from "@/components/ui/Btn.vue";
 const store = useEditorStore();
 
 const state = reactive({
+  doShowCodeEditor: false,
   graph: null as KnitGraph | null,
   simulation: {
     running: false,
@@ -72,7 +85,7 @@ const pattern=(stitch)=>{
             this.color(0xffb000)
         }else{
           this.color(0xdc267f);
-        } 
+        }
         this.knit(6, stitch)
     }
     this.end_row()
@@ -177,6 +190,11 @@ watch(
     store.setCode(newCode);
   },
 );
+
+const toggleEditor = () => {
+  state.doShowCodeEditor = !state.doShowCodeEditor;
+};
+
 const reset = () => {
   state.simulation.running = false;
   state.simulation.step = 0;
@@ -192,29 +210,54 @@ const reset = () => {
     // state.viz.destroy()
   }
 };
+
+const onPatternGenerated = (graph: KnitGraph) => {
+  state.graph = graph;
+  showPattern();
+};
+
+const showPattern = () => {
+  if (!state.graph) {
+    console.warn("No pattern to visualize!");
+    return;
+  }
+
+  reset();
+  try {
+    state.viz = new PatternViz3D("#pattern_viz_3d", state.graph as KnitGraph);
+    state.overlay_manager = new KnitGraphOverlayManager(state.viz as PatternViz3D, store.view as EditorView);
+
+    state.viz.on(PatternViz3DEvents.mouseover, (e) => {
+      if (state.overlay_manager) {
+        state.overlay_manager.addOverlay(e);
+      }
+    });
+
+    state.viz.on(PatternViz3DEvents.mouseout, (e) => {
+      if (state.overlay_manager) {
+        state.overlay_manager.removeOverlay(e);
+      }
+    });
+
+    state.viz.on(PatternViz3DEvents.render, (e) => {
+      if (state.overlay_manager) {
+        state.overlay_manager.update();
+      }
+    });
+  } catch (error) {
+    console.error("Error creating visualization:", error);
+  }
+};
+
 const runCode = () => {
   reset();
   state.graph = new KnitGraph();
   state.graph.execute(store.code);
   console.log("Ran code:", state.graph);
-  state.viz = new PatternViz3D("#pattern_viz_3d", state.graph as KnitGraph);
-  state.overlay_manager = new KnitGraphOverlayManager(state.viz as PatternViz3D, store.view as EditorView);
-  state.viz.on(PatternViz3DEvents.mouseover, (e) => {
-    if (state.overlay_manager) {
-      state.overlay_manager.addOverlay(e);
-    }
-  });
-  state.viz.on(PatternViz3DEvents.mouseout, (e) => {
-    if (state.overlay_manager) {
-      state.overlay_manager.removeOverlay(e);
-    }
-  });
-  state.viz.on(PatternViz3DEvents.render, (e) => {
-    if (state.overlay_manager) {
-      state.overlay_manager.update();
-    }
-  });
+
+  showPattern();
 };
+
 const startSim = () => {
   state.simulation.running = true;
   state.simulation.step = 0;
@@ -242,16 +285,42 @@ const stopSim = () => {
 </script>
 
 <style lang="scss">
+.editor-title {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  text-wrap-mode: nowrap;
+
+  button {
+    margin-left: 1rem;
+    text-wrap-mode: nowrap;
+  }
+}
+
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  min-width: 50%;
+}
+
 .pattern_viz {
   display: flex;
   flex-direction: row;
   justify-content: center;
-  align-items: center;
   height: 90vh;
   width: 95vw;
 }
 
 .code_editor {
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  align-items: start;
+  height: 90%;
+  width: 100%;
+}
+
+.visual-editor {
   display: flex;
   flex-direction: column;
   justify-content: start;
