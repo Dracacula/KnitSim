@@ -10,11 +10,12 @@
 #   -g2"
 if [ -z "$Eigen3_DIR" ]; then
   echo "Eigen3_DIR not set, using default path"
-  export Eigen3_DIR="/usr/share/eigen3/cmake/" 
+  export Eigen3_DIR="/usr/share/eigen3/cmake/"
 fi
 if ! type "emcmake" >/dev/null; then
   echo "emcmake not in path, trying to source emsdk"
-  source "/home/$(whoami)/Downloads/Software/emsdk/emsdk_env.sh"
+  source "~/Projects/emsdk/emsdk_env.fish"
+
 fi
 
 emcmake cmake . -B dist -DEigen3_DIR=$Eigen3_DIR
