@@ -14,7 +14,7 @@ if [ -z "$Eigen3_DIR" ]; then
 fi
 if ! type "emcmake" >/dev/null; then
   echo "emcmake not in path, trying to source emsdk"
-  source "~/Projects/emsdk/emsdk_env.fish"
+  source "~/Projects/emsdk/emsdk_env.sh"
 
 fi
 

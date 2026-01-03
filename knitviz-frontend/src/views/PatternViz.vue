@@ -3,7 +3,7 @@
     <div class="pattern_viz">
       <div class="editor-container">
         <div class="editor-title">
-          <h2>{{ state.doShowCodeEditor ? "Code Editor" : "Visual Editor" }}</h2>
+          <h2>{{ state.doShowCodeEditor ? "Code Editor" : "Knitting Pattern Editor (Blockly):" }}</h2>
           <button @click="toggleEditor">
             Switch to {{ state.doShowCodeEditor ? "Visual Editor" : "Code Editor" }}
           </button>

@@ -1,178 +1,417 @@
 <template>
-  <div class="form-section">
-    <label>Cast on Stiches:</label>
-    <div class="control-row">
-      <input type="range" v-model.number="params.castOn" min="5" max="100" step="2" />
-      <input type="number" v-model.number="params.castOn" min="10" max="100" class="number-input" />
+  <div class="editor-container">
+    <div class="blockly-section">
+      <div class="blockly-container">
+        <div id="blocklyDiv" class="blockly-editor"></div>
+      </div>
+    </div>
+
+    <div class="action-buttons">
+      <Btn @click="generatePatternFromBlockly" :btn_width="'16rem'">Generate Pattern</Btn>
+      <Btn @click="resetBlockly" :btn_width="'8rem'">Reset</Btn>
+    </div>
+
+    <div v-if="generatedCode" class="code-output">
+      <label>Generated Code</label>
+      <pre>{{ generatedCode }}</pre>
     </div>
   </div>
-
-  <div class="form-section">
-    <label>Number of Rows: </label>
-    <div class="control-row">
-      <input type="range" v-model.number="params.rows" min="5" step="2" />
-      <input type="number" v-model.number="params.rows" min="10" class="number-input" />
-    </div>
-  </div>
-
-  <div class="form-section">
-    <label>Knitting Mode: </label>
-    <div class="button-group">
-      <Btn :toggleable="true" v-model="params.isRound" :btn_width="'8rem'">
-        {{ params.isRound ? "Round" : "Flat" }}
-      </Btn>
-    </div>
-  </div>
-
-  <div class="form-section">
-    <div class="color-picker">
-      <label>Yarn Color:</label>
-      <input type="color" v-model="params.color" />
-      <input type="text" v-model="params.color" class="color-input" />
-    </div>
-  </div>
-
-  <div class="action-buttons">
-    <Btn @click="generatePattern" :btn_width="'12rem'">Generate</Btn>
-    <Btn @click="resetParams" :btn_width="'8rem'">Reset</Btn>
-  </div>
+  
 </template>
 
 <script setup lang="ts">
-import { KnitGraph, KnitMode } from "@/knitgraph";
+import { onMounted, ref } from "vue";
+import { KnitGraph } from "@/knitgraph";
 import Btn from "@/components/ui/Btn.vue";
-import { reactive } from "vue";
 
-// TODO: Sync states between code editor and visual editor
+// Import Blockly core.
+import * as Blockly from 'blockly/core';
+// Import the default blocks.
+import * as libraryBlocks from 'blockly/blocks';
+// Import a generator.
+import {javascriptGenerator} from 'blockly/javascript';
+import {colourBlend} from '@blockly/field-colour';
+
+let blocklyWorkspace: Blockly.WorkspaceSvg | null = null;
+const generatedCode = ref<string>("");
+  
+// Initialize Blockly with color picker support.
+colourBlend.installBlock({
+  javascript: javascriptGenerator
+})
+
+onMounted(() => {
+  // Custom Sticking Blocks
+  const definitions = Blockly.common.createBlockDefinitionsFromJsonArray([
+  {
+    type: 'knit_cast_on',
+    message0: 'Cast on %1 stitches (%2)',
+    args0: [
+      {
+        type: 'field_number',
+        name: 'STITCHES',
+        value: 24,
+      },
+      {
+        type: 'field_dropdown',
+        name: 'MODE',
+        options: [
+          ['Flat', 'FLAT'],
+          ['Round', 'ROUND'],
+        ],
+      }
+    ],
+    nextStatement: null,
+    colour: 230,
+    tooltip: 'Start a project with stitch count and flat/round mode',
+  },
+  {
+    type: 'knit_row',
+    message0: 'Row',
+    message1: 'do %1',
+    message2: 'then end row',
+    args1: [{ type: 'input_statement', name: 'DO' }],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 210,
+    tooltip: 'Make a row by grouping stitches together',
+  },
+  {
+    type: 'knit_repeat',
+    message0: 'Repeat %1 times',
+    message1: 'do %1',
+    args0: [{ type: 'field_number', name: 'TIMES', value: 3, min: 1 }],
+    args1: [{ type: 'input_statement', name: 'DO' }],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 120,
+    tooltip: 'Repeat the inner actions N times',
+  },
+  {
+    type: 'knit_knit_color',
+    message0: 'Knit %1 stitches in %2',
+    args0: [
+      { type: 'field_number', name: 'STITCHES', value: 4 },
+      { type: 'field_colour', name: 'COLOR', colour: '#0011ff' },
+    ],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 190,
+    tooltip: 'Knit N stitches using this color',
+  },
+  {
+    type: 'knit_purl_color',
+    message0: 'Purl %1 stitches in %2',
+    args0: [
+      { type: 'field_number', name: 'STITCHES', value: 4 },
+      { type: 'field_colour', name: 'COLOR', colour: '#8888ff' },
+    ],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 190,
+    tooltip: 'Purl N stitches using this color',
+  },
+  {
+    type: 'knit_garter',
+    message0: 'Garter stitch %1 stitches for %2 rows',
+    args0: [
+      { type: 'field_number', name: 'STITCHES', value: 20 },
+      { type: 'field_number', name: 'ROWS', value: 4 },
+    ],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 120,
+    tooltip: 'All-knit rows for classic garter texture (auto ends rows)',
+  },
+  {
+    type: 'knit_stockinette',
+    message0: 'Stockinette %1 stitches for %2 rows',
+    args0: [
+      { type: 'field_number', name: 'STITCHES', value: 20 },
+      { type: 'field_number', name: 'ROWS', value: 4 },
+    ],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 100,
+    tooltip: 'Alternates knit/purl rows for smooth stockinette (auto ends rows)',
+  },
+  {
+    type: 'knit_rib',
+    message0: 'Rib K%1 P%2 repeat %3 for %4 rows',
+    args0: [
+      { type: 'field_number', name: 'K', value: 1 },
+      { type: 'field_number', name: 'P', value: 1 },
+      { type: 'field_number', name: 'REPEAT', value: 10 },
+      { type: 'field_number', name: 'ROWS', value: 4 },
+    ],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 80,
+    tooltip: 'Builds K/P ribbing across the row for multiple rows (auto ends rows)',
+  },
+  {
+    type: 'knit_color',
+    message0: 'Set color %1 weight %2',
+    args0: [
+      {
+        type: 'field_colour',
+        name: 'COLOR',
+        colour: '#0011ff',
+      },
+      {
+        type: 'field_number',
+        name: 'WEIGHT',
+        value: 1.0,
+        precision: 0.1,
+      }
+    ],
+    previousStatement: null,
+    nextStatement: null,
+    colour: 185,
+    tooltip: 'Change yarn color and weight before knitting more rows',
+  },
+  {
+    type: 'knit_end_row',
+    message0: 'End row',
+    previousStatement: null,
+    nextStatement: null,
+    colour: 160,
+    tooltip: 'Finish the current row; use after Knit row blocks',
+  },
+]);
+
+// Register the definitions.
+Blockly.common.defineBlocks(definitions);
+
+  const toolbox = {
+    kind: 'categoryToolbox',
+    contents: [
+      {
+        kind: 'category',
+        name: 'Setup',
+        contents: [
+          { kind: 'block', type: 'knit_cast_on' },
+          { kind: 'block', type: 'knit_color' },
+        ],
+      },
+      {
+        kind: 'category',
+        name: 'Manual Rows',
+        contents: [
+          { kind: 'label', text: 'Use Row (auto end) to close row' },
+          { kind: 'block', type: 'knit_row' },
+          { kind: 'block', type: 'knit_repeat' },
+          { kind: 'block', type: 'knit_knit_color' },
+          { kind: 'block', type: 'knit_purl_color' },
+          { kind: 'block', type: 'knit_end_row' },
+        ],
+      },
+      {
+        kind: 'category',
+        name: 'Patterns',
+        contents: [
+          { kind: 'block', type: 'knit_garter' },
+          { kind: 'block', type: 'knit_stockinette' },
+          { kind: 'block', type: 'knit_rib' },
+        ],
+      },
+    ],
+  };
+
+  // Inject the workspace
+  blocklyWorkspace = Blockly.inject('blocklyDiv', { 
+    toolbox: toolbox,
+    scrollbars: true,
+    trashcan: true,
+  }) as Blockly.WorkspaceSvg;
+
+  // Define code generators for custom blocks
+  javascriptGenerator.forBlock['knit_cast_on'] = function(block) {
+    const stitches = block.getFieldValue('STITCHES');
+    const mode = block.getFieldValue('MODE');
+    const modeStr = mode === 'ROUND' ? 'round' : 'flat';
+    return `state.cast_on(${stitches}, '${modeStr}');\n`;
+  };
+
+  javascriptGenerator.forBlock['knit_color'] = function(block) {
+    const color = block.getFieldValue('COLOR');
+    const weight = block.getFieldValue('WEIGHT');
+    return `state.color('${color}', ${weight});\n`;
+  };
+
+  javascriptGenerator.forBlock['knit_knit_color'] = function(block) {
+    const stitches = block.getFieldValue('STITCHES');
+    const color = block.getFieldValue('COLOR');
+    return `state.color('${color}', 1); state.knit(${stitches}, 'KNIT');\n`;
+  };
+
+  javascriptGenerator.forBlock['knit_purl_color'] = function(block) {
+    const stitches = block.getFieldValue('STITCHES');
+    const color = block.getFieldValue('COLOR');
+    return `state.color('${color}', 1); state.knit(${stitches}, 'PURL');\n`;
+  };
+
+  javascriptGenerator.forBlock['knit_row'] = function(block) {
+    const inner = javascriptGenerator.statementToCode(block, 'DO');
+    return `${inner}state.end_row();\n`;
+  };
+
+  javascriptGenerator.forBlock['knit_repeat'] = function(block) {
+    const times = block.getFieldValue('TIMES');
+    const inner = javascriptGenerator.statementToCode(block, 'DO');
+    return `for (let i = 0; i < ${times}; i++) { ${inner} }\n`;
+  };
+
+  javascriptGenerator.forBlock['knit_garter'] = function(block) {
+    const stitches = block.getFieldValue('STITCHES');
+    const rows = block.getFieldValue('ROWS');
+    return `for (let r = 0; r < ${rows}; r++) { state.knit(${stitches}, 'KNIT'); state.end_row(); }\n`;
+  };
+
+  javascriptGenerator.forBlock['knit_stockinette'] = function(block) {
+    const stitches = block.getFieldValue('STITCHES');
+    const rows = block.getFieldValue('ROWS');
+    return `for (let r = 0; r < ${rows}; r++) { const t = (r % 2 === 0) ? 'KNIT' : 'PURL'; state.knit(${stitches}, t); state.end_row(); }\n`;
+  };
+
+  javascriptGenerator.forBlock['knit_rib'] = function(block) {
+    const k = block.getFieldValue('K');
+    const p = block.getFieldValue('P');
+    const repeat = block.getFieldValue('REPEAT');
+    const rows = block.getFieldValue('ROWS');
+    return `for (let r = 0; r < ${rows}; r++) { for (let i = 0; i < ${repeat}; i++) { state.knit(${k}, 'KNIT'); state.knit(${p}, 'PURL'); } state.end_row(); }\n`;
+  };
+
+  javascriptGenerator.forBlock['knit_end_row'] = function() {
+    return `state.end_row();\n`;
+  };
+
+  // Listen for changes (automatically generate code on change, maybe remove later when code gets too big)
+  blocklyWorkspace.addChangeListener(() => {
+    const code = javascriptGenerator.workspaceToCode(blocklyWorkspace!);
+    console.log("Blockly code updated:", code);
+    generateCodeFromBlockly();
+  });
+
+  console.log("Blockly workspace initialized.");
+});
 
 const emit = defineEmits<{
   (emit: "patternGenerated", graph: KnitGraph): void;
 }>();
 
-const params = reactive({
-  castOn: 24,
-  rows: 12,
-  isRound: false,
-  color: "#0011ff",
-  weight: 1.0,
-});
-
-const resetParams = () => {
-  params.castOn = 24;
-  params.rows = 12;
-  params.isRound = false;
-  params.color = "0011ff";
-  params.weight = 1.0;
+const generateCodeFromBlockly = () => {
+  if (!blocklyWorkspace) return;
+  
+  const code = javascriptGenerator.workspaceToCode(blocklyWorkspace);
+  generatedCode.value = code;
+  console.log("Generated code from blocks:", code);
 };
 
-const generatePattern = () => {
+const generatePatternFromBlockly = () => {
+  if (!blocklyWorkspace) return;
+  
+  const code = javascriptGenerator.workspaceToCode(blocklyWorkspace);
+  
   const graph = new KnitGraph();
   const state = graph.state;
-
-  state.cast_on(params.castOn, params.isRound ? KnitMode.ROUND : KnitMode.FLAT);
-
-  generateFlatPattern(state);
-
-  emit("patternGenerated", graph);
+  
+  try {
+    const runner = new Function('state', code);
+    runner(state);
+    
+    emit("patternGenerated", graph);
+    console.log("Pattern generated successfully");
+  } catch (error) {
+    console.error("Error executing generated code:", error);
+    alert("Error generating pattern. Check console for details.");
+  }
 };
 
-const generateFlatPattern = (state: any) => {
-  for (let row = 0; row < params.rows; row++) {
-    state.color(params.color, params.weight);
-
-    if (params.isRound) {
-      state.knit(params.castOn, "KNIT");
-    } else {
-      state.knit(params.castOn, row % 2 === 0 ? "KNIT" : "PURL");
-    }
-
-    state.end_row();
-  }
+const resetBlockly = () => {
+  if (!blocklyWorkspace) return;
+  blocklyWorkspace.clear();
+  generatedCode.value = "";
 };
 </script>
 
 <style lang="scss" scoped>
-.form-selections {
+.editor-container {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
+  width: 100%;
 }
 
-.form-section {
+.blockly-container {
+  width: 100%;
+  background: #fafafa;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  min-height: 360px;
+  height: clamp(360px, 60vh, 720px);
+  overflow: hidden;
+}
+
+.blockly-editor {
+  width: 100%;
+  height: 100%;
+}
+
+.blockly-section {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-
-  label {
-    font-weight: 500;
-    color: #555;
-    font-size: 0.95rem;
-  }
-}
-
-.control-row {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-
-  input[type="range"] {
-    flex: 1;
-    min-width: 150px;
-  }
-
-  .number-input {
-    width: 70px;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-family: inherit;
-  }
-}
-
-.button-group {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.color-picker {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-
-  label {
-    min-width: 120px;
-    font-weight: 500;
-    color: #555;
-  }
-
-  input[type="color"] {
-    width: 60px;
-    height: 40px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-
-  .color-input {
-    width: 100px;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 0.85rem;
-  }
 }
 
 .action-buttons {
   display: flex;
   gap: 1rem;
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 2px solid #ddd;
   flex-wrap: wrap;
+  padding: 1rem 0;
+  border-top: 2px solid #ddd;
+  border-bottom: 2px solid #ddd;
+}
+
+.code-output {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  width: 100%;
+
+  label {
+    font-weight: 600;
+    color: #333;
+    font-size: 0.9rem;
+  }
+
+  pre {
+    background-color: #fff;
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    margin: 0;
+  }
 }
 
 input[type="range"] {
   cursor: pointer;
+}
+
+@media (max-width: 960px) {
+  .action-buttons {
+    justify-content: flex-start;
+  }
+
+  .blockly-container {
+    height: clamp(320px, 55vh, 640px);
+  }
 }
 </style>

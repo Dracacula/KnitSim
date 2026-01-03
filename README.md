@@ -24,3 +24,17 @@ cd knitviz-frontend
 docker build . -t knitviz-frontend
 docker run -it -p 16001:80 knitvknitviz-frontend 
 ```
+
+Updated build instructions:
+
+```sh
+required packages: emscripten, cmake, nodejs, npm
+download and install emsdk from https://emscripten.org/docs/getting_started/downloads.html
+
+source ./emsdk_env.sh
+cd knitviz-frontend
+
+./build-wasm.sh (or execute the commands in the script manually)
+npm i -D
+npm run dev
+```
