@@ -31,6 +31,15 @@ import * as libraryBlocks from 'blockly/blocks';
 // Import a generator.
 import {javascriptGenerator} from 'blockly/javascript';
 import {colourBlend} from '@blockly/field-colour';
+// Import custom knitting blocks (optional - add your custom blocks to knitBlocks.ts)
+import { registerCustomBlocks } from './knitBlocks';
+
+export interface ToolBoxContent {
+  kind: string;
+  name?: string;
+
+  contents?: (ToolBoxContent | { kind: string; type: string; text?: string })[];
+}
 
 let blocklyWorkspace: Blockly.WorkspaceSvg | null = null;
 const generatedCode = ref<string>("");
@@ -41,7 +50,7 @@ colourBlend.installBlock({
 })
 
 onMounted(() => {
-  // Custom Sticking Blocks
+  // Standard knitting block definitions
   const definitions = Blockly.common.createBlockDefinitionsFromJsonArray([
   {
     type: 'knit_cast_on',
@@ -180,8 +189,11 @@ onMounted(() => {
   },
 ]);
 
-// Register the definitions.
-Blockly.common.defineBlocks(definitions);
+  // Register custom pattern blocks from knitBlocks.ts (if any)
+  const customBlocks = registerCustomBlocks();
+
+  // Register the definitions.
+  Blockly.common.defineBlocks(definitions);
 
   const toolbox = {
     kind: 'categoryToolbox',
@@ -190,19 +202,20 @@ Blockly.common.defineBlocks(definitions);
         kind: 'category',
         name: 'Setup',
         contents: [
+          {kind: 'label', text: 'Start your project here' },
           { kind: 'block', type: 'knit_cast_on' },
-          { kind: 'block', type: 'knit_color' },
         ],
       },
       {
         kind: 'category',
         name: 'Manual Rows',
         contents: [
-          { kind: 'label', text: 'Use Row (auto end) to close row' },
+          { kind: 'label', text: 'Use these to build rows stitch-by-stitch' },
           { kind: 'block', type: 'knit_row' },
           { kind: 'block', type: 'knit_repeat' },
           { kind: 'block', type: 'knit_knit_color' },
           { kind: 'block', type: 'knit_purl_color' },
+          { kind: 'block', type: 'knit_color' },
           { kind: 'block', type: 'knit_end_row' },
         ],
       },
@@ -210,11 +223,17 @@ Blockly.common.defineBlocks(definitions);
         kind: 'category',
         name: 'Patterns',
         contents: [
+          { kind: 'label', text: 'Use these to create common stitch patterns' },
           { kind: 'block', type: 'knit_garter' },
           { kind: 'block', type: 'knit_stockinette' },
           { kind: 'block', type: 'knit_rib' },
         ],
       },
+      ...customBlocks.map(block => ({
+        kind: 'category',
+        name: block.name || 'Custom',
+        contents: block.contents
+      })),
     ],
   };
 
