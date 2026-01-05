@@ -29,8 +29,8 @@ import * as Blockly from 'blockly/core';
 // Import the default blocks.
 import * as libraryBlocks from 'blockly/blocks';
 // Import a generator.
-import {javascriptGenerator} from 'blockly/javascript';
-import {colourBlend} from '@blockly/field-colour';
+import { javascriptGenerator } from 'blockly/javascript';
+import { colourBlend } from '@blockly/field-colour';
 // Import custom knitting blocks (optional - add your custom blocks to knitBlocks.ts)
 import { registerCustomBlocks } from './knitBlocks';
 
@@ -202,7 +202,7 @@ onMounted(() => {
         kind: 'category',
         name: 'Setup',
         contents: [
-          {kind: 'label', text: 'Start your project here' },
+          { kind: 'label', text: 'Start your project here' },
           { kind: 'block', type: 'knit_cast_on' },
         ],
       },
@@ -245,63 +245,63 @@ onMounted(() => {
   }) as Blockly.WorkspaceSvg;
 
   // Define code generators for custom blocks
-  javascriptGenerator.forBlock['knit_cast_on'] = function(block) {
+  javascriptGenerator.forBlock['knit_cast_on'] = function (block) {
     const stitches = block.getFieldValue('STITCHES');
     const mode = block.getFieldValue('MODE');
     const modeStr = mode === 'ROUND' ? 'round' : 'flat';
     return `state.cast_on(${stitches}, '${modeStr}');\n`;
   };
 
-  javascriptGenerator.forBlock['knit_color'] = function(block) {
+  javascriptGenerator.forBlock['knit_color'] = function (block) {
     const color = block.getFieldValue('COLOR');
     const weight = block.getFieldValue('WEIGHT');
     return `state.color('${color}', ${weight});\n`;
   };
 
-  javascriptGenerator.forBlock['knit_knit_color'] = function(block) {
+  javascriptGenerator.forBlock['knit_knit_color'] = function (block) {
     const stitches = block.getFieldValue('STITCHES');
     const color = block.getFieldValue('COLOR');
-    return `state.color('${color}', 1); state.knit(${stitches}, 'KNIT');\n`;
+    return `state.color('${color}', 1);\nstate.knit(${stitches}, 'KNIT');\n`;
   };
 
-  javascriptGenerator.forBlock['knit_purl_color'] = function(block) {
+  javascriptGenerator.forBlock['knit_purl_color'] = function (block) {
     const stitches = block.getFieldValue('STITCHES');
     const color = block.getFieldValue('COLOR');
-    return `state.color('${color}', 1); state.knit(${stitches}, 'PURL');\n`;
+    return `state.color('${color}', 1);\nstate.knit(${stitches}, 'PURL');\n`;
   };
 
-  javascriptGenerator.forBlock['knit_row'] = function(block) {
+  javascriptGenerator.forBlock['knit_row'] = function (block) {
     const inner = javascriptGenerator.statementToCode(block, 'DO');
     return `${inner}state.end_row();\n`;
   };
 
-  javascriptGenerator.forBlock['knit_repeat'] = function(block) {
+  javascriptGenerator.forBlock['knit_repeat'] = function (block) {
     const times = block.getFieldValue('TIMES');
     const inner = javascriptGenerator.statementToCode(block, 'DO');
-    return `for (let i = 0; i < ${times}; i++) { ${inner} }\n`;
+    return `for (let i = 0; i < ${times}; i++) {\n${inner}}\n`;
   };
 
-  javascriptGenerator.forBlock['knit_garter'] = function(block) {
+  javascriptGenerator.forBlock['knit_garter'] = function (block) {
     const stitches = block.getFieldValue('STITCHES');
     const rows = block.getFieldValue('ROWS');
-    return `for (let r = 0; r < ${rows}; r++) { state.knit(${stitches}, 'KNIT'); state.end_row(); }\n`;
+    return `for (let r = 0; r < ${rows}; r++) {\nstate.knit(${stitches}, 'KNIT');\nstate.end_row();}\n`;
   };
 
-  javascriptGenerator.forBlock['knit_stockinette'] = function(block) {
+  javascriptGenerator.forBlock['knit_stockinette'] = function (block) {
     const stitches = block.getFieldValue('STITCHES');
     const rows = block.getFieldValue('ROWS');
-    return `for (let r = 0; r < ${rows}; r++) { const t = (r % 2 === 0) ? 'KNIT' : 'PURL'; state.knit(${stitches}, t); state.end_row(); }\n`;
+    return `for (let r = 0; r < ${rows}; r++) {\nconst t = (r % 2 === 0) ? 'KNIT' : 'PURL';\nstate.knit(${stitches}, t);\nstate.end_row();}\n`;
   };
 
-  javascriptGenerator.forBlock['knit_rib'] = function(block) {
+  javascriptGenerator.forBlock['knit_rib'] = function (block) {
     const k = block.getFieldValue('K');
     const p = block.getFieldValue('P');
     const repeat = block.getFieldValue('REPEAT');
     const rows = block.getFieldValue('ROWS');
-    return `for (let r = 0; r < ${rows}; r++) { for (let i = 0; i < ${repeat}; i++) { state.knit(${k}, 'KNIT'); state.knit(${p}, 'PURL'); } state.end_row(); }\n`;
+    return `for (let r = 0; r < ${rows}; r++) {\nfor (let i = 0; i < ${repeat}; i++) { state.knit(${k}, 'KNIT'); state.knit(${p}, 'PURL'); }\nstate.end_row();}\n`;
   };
 
-  javascriptGenerator.forBlock['knit_end_row'] = function() {
+  javascriptGenerator.forBlock['knit_end_row'] = function () {
     return `state.end_row();\n`;
   };
 
@@ -322,7 +322,11 @@ const emit = defineEmits<{
 const generateCodeFromBlockly = () => {
   if (!blocklyWorkspace) return;
   
-  const code = javascriptGenerator.workspaceToCode(blocklyWorkspace);
+  var code = javascriptGenerator.workspaceToCode(blocklyWorkspace);
+
+  // so that the generated code can be copied into the code editor directly
+  code = code.replace(/state\./g, 'this.');
+
   generatedCode.value = code;
   console.log("Generated code from blocks:", code);
 };

@@ -66,52 +66,65 @@ export function registerCustomGenerators() {
 export const patternPresets = {
     stripedPattern: {
         kind: 'block',
-        type: 'knit_repeat',
-        fields: {
-            TIMES: 10
-        },
+        type: 'knit_row',
         inputs: {
             DO: {
                 block: {
-                    type: 'knit_row',
-                    next: {
+                    type: 'knit_knit_color',
+                    fields: {
+                        STITCHES: 24,
+                        COLOR: '#ffff00'
+                    }
+                }
+            }
+        },
+        next: {
+            block: {
+                type: 'knit_repeat',
+                fields: {
+                    TIMES: 10
+                },
+                inputs: {
+                    DO: {
                         block: {
-                            type: 'knit_row',
-                            inputs: {
-                                DO: {
-                                    block: {
-                                        type: 'knit_knit_color',
-                                        fields: {
-                                            STITCHES: 6,
-                                            COLOR: '#0000ff'
-                                        },
-                                        next: {
+                                    type: 'knit_row',
+                                    inputs: {
+                                        DO: {
                                             block: {
-                                                type: 'knit_purl_color',
+                                                type: 'knit_knit_color',
                                                 fields: {
-                                                    STITCHES: 4,
-                                                    COLOR: '#ff0000'
+                                                    STITCHES: 6,
+                                                    COLOR: '#0000ff'
                                                 },
                                                 next: {
                                                     block: {
-                                                        type: 'knit_knit_color',
+                                                        type: 'knit_purl_color',
                                                         fields: {
                                                             STITCHES: 4,
-                                                            COLOR: '#0000ff'
+                                                            COLOR: '#ff0000'
                                                         },
                                                         next: {
                                                             block: {
-                                                                type: 'knit_purl_color',
+                                                                type: 'knit_knit_color',
                                                                 fields: {
                                                                     STITCHES: 4,
-                                                                    COLOR: '#ff0000'
+                                                                    COLOR: '#0000ff'
                                                                 },
                                                                 next: {
                                                                     block: {
-                                                                        type: 'knit_knit_color',
+                                                                        type: 'knit_purl_color',
                                                                         fields: {
-                                                                            STITCHES: 6,
-                                                                            COLOR: '#0000ff'
+                                                                            STITCHES: 4,
+                                                                            COLOR: '#ff0000'
+                                                                        },
+                                                                        next: {
+                                                                            block: {
+                                                                                type: 'knit_knit_color',
+                                                                                fields: {
+                                                                                    STITCHES: 6,
+                                                                                    COLOR: '#0000ff'
+                                                                                }
+                                                                            }
                                                                         }
                                                                     }
                                                                 }
@@ -121,34 +134,21 @@ export const patternPresets = {
                                                 }
                                             }
                                         }
-                                    }
+                                    },
                                 }
-                            },
-                            next: {
+                    }
+                },
+                next: {
+                    block: {
+                        type: 'knit_row',
+                        inputs: {
+                            DO: {
                                 block: {
-                                    type: 'knit_row',
-                                    inputs: {
-                                        DO: {
-                                            block: {
-                                                type: 'knit_knit_color',
-                                                fields: {
-                                                    STITCHES: 24,
-                                                    COLOR: '#ffff00'
-                                                }
-                                            }
-                                        }
+                                    type: 'knit_knit_color',
+                                    fields: {
+                                        STITCHES: 24,
+                                        COLOR: '#ffff00'
                                     }
-                                }
-                            }
-                        }
-                    },
-                    inputs: {
-                        DO: {
-                            block: {
-                                type: 'knit_knit_color',
-                                fields: {
-                                    STITCHES: 24,
-                                    COLOR: '#ffff00'
                                 }
                             }
                         }
