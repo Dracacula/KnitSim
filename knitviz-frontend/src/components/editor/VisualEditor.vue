@@ -1,7 +1,7 @@
 <template>
   <div class="editor-container">
     <div class="blockly-section">
-      <div class="blockly-container">
+      <div id="blocklyContainer" class="blockly-container">
         <div id="blocklyDiv" class="blockly-editor"></div>
       </div>
     </div>
@@ -11,25 +11,19 @@
       <Btn @click="store.serializeBlocksToJson" :btn_width="'16rem'">Export as Preset JSON</Btn>
       <Btn @click="store.resetBlockly" :btn_width="'8rem'">Reset</Btn>
     </div>
-
-    <div v-if="store.generatedCode" class="code-output">
-      <label>Generated Code</label>
-      <pre>{{ store.generatedCode }}</pre>
-    </div>
   </div>
 
 </template>
 
 <script setup lang="ts">
 import { onMounted } from "vue";
-import { KnitGraph } from "@/knitgraph";
 import { useVisualEditorStore } from "@/stores/visualEditor";
 import Btn from "@/components/ui/Btn.vue";
 
 const store = useVisualEditorStore();
 
 const emit = defineEmits<{
-  (emit: "patternGenerated", graph: KnitGraph): void;
+  (emit: "codeGenerated", code: string): void;
 }>();
 
 onMounted(() => {
@@ -37,9 +31,9 @@ onMounted(() => {
 });
 
 const handleGeneratePattern = () => {
-  const graph = store.generatePatternFromBlockly();
-  if (graph) {
-    emit("patternGenerated", graph);
+  const code = store.generatePatternFromBlockly();
+  if (code) {
+    emit("codeGenerated", code);
   }
 };
 </script>
@@ -63,9 +57,9 @@ const handleGeneratePattern = () => {
 }
 
 .blockly-editor {
-  width: 100%;
-  height: 100%;
-}
+    width: 100%;
+    height: 100%;
+  }
 
 .blockly-section {
   display: flex;
@@ -80,34 +74,6 @@ const handleGeneratePattern = () => {
   padding: 1rem 0;
   border-top: 2px solid #ddd;
   border-bottom: 2px solid #ddd;
-}
-
-.code-output {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 1rem;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  width: 100%;
-
-  label {
-    font-weight: 600;
-    color: #333;
-    font-size: 0.9rem;
-  }
-
-  pre {
-    background-color: #fff;
-    padding: 0.75rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    overflow-x: auto;
-    font-family: 'Courier New', monospace;
-    font-size: 0.85rem;
-    margin: 0;
-  }
 }
 
 input[type="range"] {

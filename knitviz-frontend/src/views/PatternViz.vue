@@ -2,18 +2,32 @@
   <main>
     <div class="pattern_viz">
       <div class="editor-container">
-        <div class="editor-title">
-          <h2>{{ state.doShowCodeEditor ? "Code Editor" : "Knitting Pattern Editor (Blockly):" }}</h2>
-          <button @click="toggleEditor">
-            Switch to {{ state.doShowCodeEditor ? "Visual Editor" : "Code Editor" }}
+        <div class="editor-tabs">
+          <button 
+            @click="activeTab = 'code'"
+            :style="{ fontWeight: activeTab === 'code' ? 'bold' : 'normal' }"
+          >
+            Code Editor
+          </button>
+          <button 
+            @click="activeTab = 'visual'"
+            :style="{ fontWeight: activeTab === 'visual' ? 'bold' : 'normal' }"
+          >
+            Visual Editor
+          </button>
+          <button 
+            @click="activeTab = 'grid'"
+            :style="{ fontWeight: activeTab === 'grid' ? 'bold' : 'normal' }"
+          >
+            Grid Editor (Coming Soon)
           </button>
         </div>
 
-        <div class="visual-editor" v-if="!state.doShowCodeEditor">
-          <VisualEditor @patternGenerated="onPatternGenerated"></VisualEditor>
+        <div class="visual-editor" v-show="activeTab === 'visual'">
+          <VisualEditor @codeGenerated="onCodeGenerated"></VisualEditor>
         </div>
-        <div class="code_editor" v-if="state.doShowCodeEditor">
-          <Code v-if="state.doShowCodeEditor"></Code>
+        <div class="code_editor" v-show="activeTab === 'code'">
+          <Code></Code>
           <div class="code_editor_header">
             <Btn @click="runCode">Run</Btn>
             <Btn @click="startSim" v-if="!state.simulation.running">Simulate</Btn>
@@ -24,6 +38,9 @@
             <div>Prefill:</div>
             <Btn @click="state.code = state.examples[k]" v-for="k in Object.keys(state.examples)">{{ k }}</Btn>
           </div>
+        </div>
+        <div class="grid_editor" v-show="activeTab === 'grid'">
+          <p>Grid Editor coming soon...</p>
         </div>
       </div>
       <div id="pattern_viz_3d"></div>
@@ -38,14 +55,20 @@ import { KnitGraph } from "../knitgraph";
 import { PatternViz3D, PatternViz3DEvents } from "../knitgraph/3d/viz";
 import { onUnmounted, reactive, ref, toRaw, watch } from "vue";
 import { useEditorStore } from "@/stores/editor";
+import { useVisualEditorStore } from "@/stores/visualEditor";
+import { useEditorStateStore } from "@/stores/editorState";
 import { KnitGraphOverlayManager } from "@/knitgraph/3d/overlay";
 import type { EditorView } from "codemirror";
 import Btn from "@/components/ui/Btn.vue";
+import { codeToGraph } from "@/pipeline/graphPipeline";
 
 const store = useEditorStore();
+const visualEditorStore = useVisualEditorStore();
+const sharedState = useEditorStateStore();
+
+const activeTab = ref<"code" | "visual" | "grid">("code");
 
 const state = reactive({
-  doShowCodeEditor: false,
   graph: null as KnitGraph | null,
   simulation: {
     running: false,
@@ -178,22 +201,39 @@ for (let i = 0; i < 6; i++) {
   viz: null as PatternViz3D | null,
   overlay_manager: null as KnitGraphOverlayManager | null,
 });
+
 onUnmounted(() => {
   if (state.simulation.running) {
     stopSim();
   }
 });
+
 watch(
   () => state.code,
   (newCode) => {
     reset();
     store.setCode(newCode);
+    if (sharedState.code !== newCode) {
+      sharedState.setCode(newCode, "code");
+    }
   },
 );
 
-const toggleEditor = () => {
-  state.doShowCodeEditor = !state.doShowCodeEditor;
-};
+watch(
+  () => sharedState.code,
+  (newCode) => {
+    if (newCode === state.code) 
+      return;
+    
+    state.code = newCode;
+
+    if (sharedState.lastEditorUsed === "visual") {
+      store.updateFromSharedCode(newCode);
+    } else if (sharedState.lastEditorUsed === "code") {
+      visualEditorStore.updateFromCode(newCode);
+    }
+  }
+);
 
 const reset = () => {
   state.simulation.running = false;
@@ -207,13 +247,13 @@ const reset = () => {
   if (state.viz) {
     state.viz.dispose();
     state.overlay_manager.dispose();
-    // state.viz.destroy()
   }
 };
 
-const onPatternGenerated = (graph: KnitGraph) => {
-  state.graph = graph;
-  showPattern();
+const onCodeGenerated = (code: string) => {
+  console.log("Code generated from visual editor:", code);
+  sharedState.setCode(code, "visual");
+  runPipeline();
 };
 
 const showPattern = () => {
@@ -251,11 +291,17 @@ const showPattern = () => {
 
 const runCode = () => {
   reset();
-  state.graph = new KnitGraph();
-  state.graph.execute(store.code);
-  console.log("Ran code:", state.graph);
+  runPipeline();
+};
 
-  showPattern();
+const runPipeline = () => {
+  try {
+    state.graph = codeToGraph(sharedState.code);
+    showPattern();
+  } catch (error) {
+    console.error("Error creating graph from code:", error);
+    alert("Error creating graph from code. Check console for details.");
+  }
 };
 
 const startSim = () => {
@@ -278,6 +324,7 @@ const startSim = () => {
   };
   state.simulation.timeout = setInterval(step, state.simulation.timeStep);
 };
+
 const stopSim = () => {
   state.simulation.running = false;
   clearInterval(state.simulation.timeout);
@@ -285,15 +332,22 @@ const stopSim = () => {
 </script>
 
 <style lang="scss">
-.editor-title {
+.editor-tabs {
   display: flex;
-  justify-content: space-between;
-  flex-wrap: nowrap;
-  text-wrap-mode: nowrap;
+  flex-direction: row;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  width: 100%;
 
   button {
-    margin-left: 1rem;
-    text-wrap-mode: nowrap;
+    padding: 0.5rem 1rem;
+    border: 1px solid #ccc;
+    background-color: #f5f5f5;
+    cursor: pointer;
+    
+    &:hover {
+      background-color: #e0e0e0;
+    }
   }
 }
 
@@ -329,6 +383,16 @@ const stopSim = () => {
   width: 100%;
 }
 
+.grid_editor {
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  align-items: start;
+  height: 90%;
+  width: 100%;
+  padding: 1rem;
+}
+
 #pattern_viz_3d {
   height: 90%;
   width: 100%;
@@ -339,6 +403,7 @@ const stopSim = () => {
   height: 100%;
   width: 100%;
 }
+
 .code_editor_header {
   display: flex;
   flex-direction: row;

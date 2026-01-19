@@ -1,13 +1,14 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { KnitGraph } from "@/knitgraph";
 import * as Blockly from 'blockly/core';
 import * as libraryBlocks from 'blockly/blocks';
 import { javascriptGenerator } from 'blockly/javascript';
 import { colourBlend } from '@blockly/field-colour';
 import { registerCustomBlocks } from "@/components/editor/knitBlocks";
+import { useEditorStateStore } from "./editorState";
 
 export const useVisualEditorStore = defineStore("visualEditor", () => {
+  const sharedState = useEditorStateStore();
   let blocklyWorkspace: Blockly.WorkspaceSvg | null = null;
   const generatedCode = ref<string>("");
 
@@ -272,130 +273,26 @@ export const useVisualEditorStore = defineStore("visualEditor", () => {
       return `state.end_row();\n`;
     };
 
-    // Listen for changes (automatically generate code on change, maybe remove later when code gets too big)
-    blocklyWorkspace.addChangeListener(() => {
-      const code = javascriptGenerator.workspaceToCode(blocklyWorkspace);
-      console.log("Blockly code updated:", code);
-      generateCodeFromBlockly();
-    });
-
     console.log("Blockly workspace initialized.");
   };
 
-  const generateCodeFromBlockly = () => {
-    if (!blocklyWorkspace) return;
+  const generateCodeFromBlockly = (): string | null => {
+    if (!blocklyWorkspace) return null;
 
-    var code = javascriptGenerator.workspaceToCode(blocklyWorkspace);
-
-    // so that the generated code can be copied into the code editor directly
+    let code = javascriptGenerator.workspaceToCode(blocklyWorkspace);
     code = code.replace(/state\./g, 'this.');
 
     generatedCode.value = code;
     console.log("Generated code from blocks:", code);
+    return code;
   };
 
-  const generatePatternFromBlockly = (): KnitGraph | null => {
-    if (!blocklyWorkspace) return null;
+  const generatePatternFromBlockly = (): string | null => {
+    const cleanCode = generateCodeFromBlockly();
+    if (!cleanCode) return null;
 
-    const code = javascriptGenerator.workspaceToCode(blocklyWorkspace);
-
-    const graph = new KnitGraph();
-    const state = graph.state;
-
-    try {
-      const runner = new Function('state', code);
-      runner(state);
-
-      console.log("Pattern generated successfully");
-      return graph;
-    } catch (error) {
-      console.error("Error executing generated code:", error);
-      alert("Error generating pattern. Check console for details.");
-      return null;
-    }
-  };
-
-  const serializeBlocksToJson = () => {
-    if (!blocklyWorkspace) return;
-
-    // Get all top-level blocks (blocks not nested inside other blocks)
-    const topBlocks = blocklyWorkspace.getTopBlocks(false);
-
-    if (topBlocks.length === 0) {
-      alert('No blocks to serialize. Please add some blocks first.');
-      return;
-    }
-
-    // Serialize each top-level block
-    const serializedBlocks = topBlocks.map(block => serializeBlock(block));
-
-    // If there's only one top-level block, return it directly, otherwise wrap in array
-    const jsonOutput = serializedBlocks.length === 1 ? serializedBlocks[0] : serializedBlocks;
-
-    const jsonString = JSON.stringify(jsonOutput, null, 2);
-    generatedCode.value = jsonString;
-
-    // Copy to clipboard
-    navigator.clipboard.writeText(jsonString).then(() => {
-      alert('Block preset JSON copied to clipboard! You can now paste it into knitBlocks.ts');
-    }).catch(() => {
-      alert('Failed to copy to clipboard. You can manually copy from the code output below.');
-    });
-  };
-
-  const serializeBlock = (block: Blockly.Block): any => {
-    const serialized: any = {
-      kind: 'block',
-      type: block.type,
-    };
-
-    // Serialize fields
-    const fields: any = {};
-    for (const field of block.inputList) {
-      if (field instanceof Blockly.FieldLabel) {
-        continue;
-      }
-      for (const f of field.fieldRow) {
-        if (f instanceof Blockly.Field) {
-          const fieldValue = f.getValue();
-          if (fieldValue !== null && fieldValue !== undefined) {
-            fields[f.name] = fieldValue;
-          }
-        }
-      }
-    }
-    if (Object.keys(fields).length > 0) {
-      serialized.fields = fields;
-    }
-
-    // Serialize inputs (child blocks)
-    const inputs: any = {};
-    for (const input of block.inputList) {
-      if (input.connection && input.connection.targetBlock()) {
-        const childBlock = input.connection.targetBlock();
-        if (childBlock) {
-          inputs[input.name] = {
-            block: serializeBlock(childBlock)
-          };
-        }
-      }
-    }
-    if (Object.keys(inputs).length > 0) {
-      serialized.inputs = inputs;
-    }
-
-    // Serialize next block (horizontal connection)
-    const nextConnection = block.nextConnection;
-    if (nextConnection && nextConnection.targetBlock()) {
-      const nextBlock = nextConnection.targetBlock();
-      if (nextBlock) {
-        serialized.next = {
-          block: serializeBlock(nextBlock)
-        };
-      }
-    }
-
-    return serialized;
+    sharedState.setCode(cleanCode, "visual");
+    return cleanCode;
   };
 
   const resetBlockly = () => {
@@ -404,13 +301,21 @@ export const useVisualEditorStore = defineStore("visualEditor", () => {
     generatedCode.value = "";
   };
 
+  // Update visual editor when code changes (from code editor)
+  // Note: Simple approach - just show placeholder text since parsing arbitrary code to blocks is complex
+  const updateFromCode = (newCode: string) => {
+    // For now, we don't auto-convert code back to blocks (would require parsing arbitrary JS)
+    // In future, could implement pattern matching for common code structures
+    console.log("Code editor updated. Blockly would need manual block recreation for:", newCode);
+  };
+
   return {
     blocklyWorkspace,
     generatedCode,
     initBlockly,
     generateCodeFromBlockly,
     generatePatternFromBlockly,
-    serializeBlocksToJson,
     resetBlockly,
+    updateFromCode,
   };
 });
